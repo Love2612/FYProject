@@ -1,0 +1,832 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audio Enhancement System</title>
+    <style>
+        :root {
+            --primary: #cd56e8;
+            --primary-light: #e18cf5;
+            --secondary: #f2f2f2;
+            --text: #454440;
+            --shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: var(--secondary);
+            color: var(--text);
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        header {
+            background-color: var(--primary);
+            color: white;
+            padding: 20px 0;
+            text-align: center;
+            margin-bottom: 30px;
+            box-shadow: var(--shadow);
+        }
+        
+        h1 {
+            margin: 0;
+            font-size: 2.5rem;
+        }
+        
+        .tab-container {
+            display: flex;
+            margin-bottom: 20px;
+            border-bottom: 2px solid var(--primary-light);
+        }
+        
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            background-color: var(--secondary);
+            border: none;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+        
+        .tab.active {
+            background-color: var(--primary);
+            color: white;
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        .card {
+            background-color: white;
+            border-radius: 8px;
+            padding: 25px;
+            margin-bottom: 30px;
+            box-shadow: var(--shadow);
+        }
+        
+        .section-title {
+            color: var(--primary);
+            border-bottom: 2px solid var(--primary-light);
+            padding-bottom: 10px;
+            margin-top: 0;
+        }
+        
+        .button {
+            background-color: var(--primary-light);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1rem;
+            margin: 5px;
+            transition: all 0.3s ease;
+            box-shadow: var(--shadow);
+        }
+        
+        .button:hover {
+            background-color: var(--primary);
+            transform: translateY(-2px);
+        }
+        
+        .button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        
+        .timer {
+            font-size: 2rem;
+            font-weight: bold;
+            color: var(--primary);
+            text-align: center;
+            margin: 20px 0;
+        }
+        
+        .audio-container {
+            display: flex;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            margin: 20px 0;
+        }
+        
+        .audio-player {
+            flex: 1;
+            min-width: 300px;
+            margin: 10px;
+            padding: 15px;
+            background-color: var(--secondary);
+            border-radius: 8px;
+        }
+        
+        .metrics {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+        
+        .metric-card {
+            background-color: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: var(--shadow);
+            text-align: center;
+        }
+        
+        .metric-value {
+            font-size: 1.8rem;
+            color: var(--primary);
+            margin: 10px 0;
+        }
+        
+        .mos-rating {
+            display: flex;
+            justify-content: center;
+            margin: 20px 0;
+        }
+        
+        .rating-option {
+            margin: 0 10px;
+            text-align: center;
+        }
+        
+        .rating-option input {
+            display: none;
+        }
+        
+        .rating-option label {
+            display: block;
+            width: 40px;
+            height: 40px;
+            line-height: 40px;
+            background-color: var(--primary-light);
+            color: white;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .rating-option input:checked + label {
+            background-color: var(--primary);
+            transform: scale(1.1);
+        }
+        
+        .status {
+            padding: 15px;
+            border-radius: 4px;
+            margin: 20px 0;
+            text-align: center;
+            display: none;
+        }
+        
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        
+        .file-upload {
+            text-align: center;
+            margin: 20px 0;
+        }
+        
+        .file-upload-label {
+            display: inline-block;
+            padding: 12px 24px;
+            background-color: var(--primary-light);
+            color: white;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .file-upload-label:hover {
+            background-color: var(--primary);
+        }
+        
+        #fileInput {
+            display: none;
+        }
+        
+        @media (max-width: 768px) {
+            .audio-container {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>Audio Enhancement System</h1>
+        </div>
+    </header>
+    
+    <div class="container">
+        <div class="tab-container">
+            <button class="tab active" id="recordTab">Record Audio</button>
+            <button class="tab" id="uploadTab">Upload Audio</button>
+        </div>
+        
+        <!-- Recording Tab -->
+        <div class="tab-content active" id="recordContent">
+            <div class="card">
+                <h2 class="section-title">Live Recording</h2>
+                <div class="timer" id="timer">04:00</div>
+                <div style="text-align: center;">
+                    <button class="button" id="startBtn">Start Recording</button>
+                    <button class="button" id="pauseBtn" disabled>Pause</button>
+                    <button class="button" id="uploadRecordBtn" disabled>Process Recording</button>
+                </div>
+                <div class="status" id="recordStatus"></div>
+            </div>
+        </div>
+        
+        <!-- Upload Tab -->
+        <div class="tab-content" id="uploadContent">
+            <div class="card">
+                <h2 class="section-title">Upload Audio File</h2>
+                <div class="file-upload">
+                    <label for="fileInput" class="file-upload-label">Choose Audio File</label>
+                    <input type="file" id="fileInput" accept=".wav,.mp3,.ogg,.m4a">
+                    <button class="button" id="uploadFileBtn" disabled>Process Upload</button>
+                </div>
+                <div class="status" id="uploadStatus"></div>
+            </div>
+        </div>
+        
+        <!-- Results Section (Shown after processing) -->
+        <div class="card" id="resultsSection" style="display: none;">
+            <h2 class="section-title">Processing Results</h2>
+            <div class="status" id="resultsStatus"></div>
+            
+            <!-- Audio Playback Section -->
+            <div class="audio-container">
+                <div class="audio-player">
+                    <h3>Original Audio</h3>
+                    <audio controls id="originalAudio"></audio>
+                </div>
+                <div class="audio-player">
+                    <h3>Enhanced Audio</h3>
+                    <audio controls id="processedAudio"></audio>
+                </div>
+            </div>
+            
+            <!-- Metrics Section -->
+            <h3 class="section-title">Quality Metrics</h3>
+            <div class="metrics">
+                <div class="metric-card">
+                    <h4>Signal-to-Noise Ratio</h4>
+                    <div class="metric-value" id="snrValue">--</div>
+                    <!-- <p>dB (higher is better)</p> -->
+                    <p><span title="Higher values mean better signal clarity.">dB (higher is better)</span></p>
+
+                </div>
+                <div class="metric-card">
+                    <h4>Processing Latency</h4>
+                    <div class="metric-value" id="latencyValue">--</div>
+                    <p><span title="Lower values mean faster system response.">seconds</span></p>
+                    <!-- <p>seconds</p> -->
+                </div>
+                <div class="metric-card">
+                    <h4>Audio Quality (PEAQ)</h4>
+                    <div class="metric-value" id="peaqValue">--</div>
+                    <p><span title="Closer to 1 means better perceptual quality.">0-1 scale</span></p>
+                    <!-- <p>0-1 scale</p> -->
+                </div>
+            </div>
+            
+            <!-- MOS Rating Section -->
+            <h3 class="section-title">Rate the Audio Quality</h3>
+            <form id="mosForm">
+                <div class="mos-rating">
+                    <div class="rating-option">
+                        <h4>Clarity</h4>
+                        <div>
+                            <input type="radio" id="clarity1" name="clarity" value="1">
+                            <label for="clarity1">1</label>
+                        </div>
+                        <div>
+                            <input type="radio" id="clarity2" name="clarity" value="2">
+                            <label for="clarity2">2</label>
+                        </div>
+                        <div>
+                            <input type="radio" id="clarity3" name="clarity" value="3">
+                            <label for="clarity3">3</label>
+                        </div>
+                        <div>
+                            <input type="radio" id="clarity4" name="clarity" value="4">
+                            <label for="clarity4">4</label>
+                        </div>
+                        <div>
+                            <input type="radio" id="clarity5" name="clarity" value="5">
+                            <label for="clarity5">5</label>
+                        </div>
+                    </div>
+                    
+                    <div class="rating-option">
+                        <h4>Noise Reduction</h4>
+                        <div>
+                            <input type="radio" id="noise1" name="noise" value="1">
+                            <label for="noise1">1</label>
+                        </div>
+                        <div>
+                            <input type="radio" id="noise2" name="noise" value="2">
+                            <label for="noise2">2</label>
+                        </div>
+                        <div>
+                            <input type="radio" id="noise3" name="noise" value="3">
+                            <label for="noise3">3</label>
+                        </div>
+                        <div>
+                            <input type="radio" id="noise4" name="noise" value="4">
+                            <label for="noise4">4</label>
+                        </div>
+                        <div>
+                            <input type="radio" id="noise5" name="noise" value="5">
+                            <label for="noise5">5</label>
+                        </div>
+                    </div>
+                    
+                    <div class="rating-option">
+                        <h4>Level Matching</h4>
+                        <div>
+                            <input type="radio" id="level1" name="level" value="1">
+                            <label for="level1">1</label>
+                        </div>
+                        <div>
+                            <input type="radio" id="level2" name="level" value="2">
+                            <label for="level2">2</label>
+                        </div>
+                        <div>
+                            <input type="radio" id="level3" name="level" value="3">
+                            <label for="level3">3</label>
+                        </div>
+                        <div>
+                            <input type="radio" id="level4" name="level" value="4">
+                            <label for="level4">4</label>
+                        </div>
+                        <div>
+                            <input type="radio" id="level5" name="level" value="5">
+                            <label for="level5">5</label>
+                        </div>
+                    </div>
+                </div>
+                <div style="text-align: center; margin-top: 20px;">
+                    <button type="submit" class="button">Submit Rating</button>
+                    <button type="button" class="button" id="downloadBtn" title="Click to save the processed audio to your device">Download Enhanced Audio</button>
+                    <button type="button" class="button" onclick="resetRatings()">Reset Ratings</button>
+                    <button type="button" class="button" onclick="location.reload()">Start New Test</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // DOM Elements
+        const recordTab = document.getElementById('recordTab');
+        const uploadTab = document.getElementById('uploadTab');
+        const recordContent = document.getElementById('recordContent');
+        const uploadContent = document.getElementById('uploadContent');
+        const startBtn = document.getElementById('startBtn');
+        const pauseBtn = document.getElementById('pauseBtn');
+        const uploadRecordBtn = document.getElementById('uploadRecordBtn');
+        const fileInput = document.getElementById('fileInput');
+        const uploadFileBtn = document.getElementById('uploadFileBtn');
+        const timer = document.getElementById('timer');
+        const recordStatus = document.getElementById('recordStatus');
+        const uploadStatus = document.getElementById('uploadStatus');
+        const resultsSection = document.getElementById('resultsSection');
+        const originalAudio = document.getElementById('originalAudio');
+        const processedAudio = document.getElementById('processedAudio');
+        const snrValue = document.getElementById('snrValue');
+        const latencyValue = document.getElementById('latencyValue');
+        const peaqValue = document.getElementById('peaqValue');
+        const mosForm = document.getElementById('mosForm');
+        const downloadBtn = document.getElementById('downloadBtn');
+        
+        // Global variables
+        let mediaRecorder;
+        let audioChunks = [];
+        let countdown;
+        let timeLeft = 4 * 60; // 4 minutes in seconds
+        let sessionId;
+        
+        // Initialize timer display
+        updateTimerDisplay();
+        
+        // Event Listeners
+        recordTab.addEventListener('click', () => switchTab('record'));
+        uploadTab.addEventListener('click', () => switchTab('upload'));
+        startBtn.addEventListener('click', startRecording);
+        pauseBtn.addEventListener('click', pauseRecording);
+        uploadRecordBtn.addEventListener('click', () => uploadAudio('record'));
+        fileInput.addEventListener('change', handleFileSelect);
+        uploadFileBtn.addEventListener('click', () => uploadAudio('file'));
+        mosForm.addEventListener('submit', submitMosRating);
+        downloadBtn.addEventListener('click', downloadAudio);
+        
+        // Functions
+        function switchTab(tab) {
+            if (tab === 'record') {
+                recordTab.classList.add('active');
+                uploadTab.classList.remove('active');
+                recordContent.classList.add('active');
+                uploadContent.classList.remove('active');
+            } else {
+                recordTab.classList.remove('active');
+                uploadTab.classList.add('active');
+                recordContent.classList.remove('active');
+                uploadContent.classList.add('active');
+            }
+        }
+        
+        function resetRatings() {
+            document.querySelectorAll('#mosForm input[type="radio"]').forEach(input => {
+                input.checked = false;
+            });
+            showStatus("Ratings reset", "success", "results");
+        }
+
+        function updateTimerDisplay() {
+            const minutes = Math.floor(timeLeft / 60);
+            const seconds = timeLeft % 60;
+            timer.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        }
+        
+        function startRecording() {
+            navigator.mediaDevices.getUserMedia({ audio: true })
+                .then(stream => {
+                    mediaRecorder = new MediaRecorder(stream);
+                    
+                    mediaRecorder.ondataavailable = event => {
+                        audioChunks.push(event.data);
+                    };
+                    
+                    mediaRecorder.onstop = () => {
+                        const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                        originalAudio.src = URL.createObjectURL(audioBlob);
+                    };
+                    
+                    mediaRecorder.start();
+                    startBtn.disabled = true;
+                    pauseBtn.disabled = false;
+                    uploadRecordBtn.disabled = false;
+                    
+                    // Start countdown
+                    countdown = setInterval(() => {
+                        timeLeft--;
+                        updateTimerDisplay();
+                        
+                        if (timeLeft <= 0) {
+                            pauseRecording();
+                            showStatus("Recording automatically stopped after 4 minutes", "success", 'record');
+                        }
+                    }, 1000);
+                    
+                    showStatus("Recording started", "success", 'record');
+                })
+                .catch(err => {
+                    showStatus(`Error accessing microphone: ${err}`, "error", 'record');
+                    console.error("Error accessing microphone:", err);
+                });
+        }
+        
+        function pauseRecording() {
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+                clearInterval(countdown);
+                pauseBtn.disabled = true;
+                showStatus("Recording paused", "success", 'record');
+                
+                // Stop all tracks
+                mediaRecorder.stream.getTracks().forEach(track => track.stop());
+            }
+        }
+        
+        function handleFileSelect() {
+            if (fileInput.files.length > 0) {
+                const file = fileInput.files[0];
+                if (!file.type.match('audio.*')) {
+                    showStatus("Please select an audio file", "error", 'upload');
+                    uploadFileBtn.disabled = true;
+                    return;
+                }
+                
+                // Create preview of the original audio
+                originalAudio.src = URL.createObjectURL(file);
+                uploadFileBtn.disabled = false;
+                showStatus(`File selected: ${file.name}`, "success", 'upload');
+            }
+        }
+        
+        function uploadAudio(source) {
+            let audioBlob;
+            const statusElement = source === 'record' ? recordStatus : uploadStatus;
+            
+            if (source === 'record' && audioChunks.length === 0) {
+                showStatus("No recording to upload", "error", 'record');
+                return;
+            } else if (source === 'file' && fileInput.files.length === 0) {
+                showStatus("No file selected", "error", 'upload');
+                return;
+            }
+            
+            if (source === 'record') {
+                audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+            } else {
+                audioBlob = fileInput.files[0];
+            }
+            
+            // Convert to WAV format if needed
+            const formData = new FormData();
+            sessionId = Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
+            const filename = `${sessionId}.wav`;
+            
+            // Ensure we're sending a WAV file
+            if (source === 'file' && !fileInput.files[0].name.endsWith('.wav')) {
+                showStatus("Converting to WAV format...", "success", source);
+                
+                // Create a temporary audio element to convert
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const fileReader = new FileReader();
+                
+                fileReader.onload = function(e) {
+                    audioContext.decodeAudioData(e.target.result)
+                        .then(buffer => {
+                            // Convert to WAV
+                            const wavBlob = bufferToWav(buffer);
+                            formData.append('file', wavBlob, filename);
+                            processUpload(formData, source);
+                        })
+                        .catch(err => {
+                            showStatus(`Error converting audio: ${err}`, "error", source);
+                            console.error("Audio conversion error:", err);
+                        });
+                };
+                
+                fileReader.readAsArrayBuffer(audioBlob);
+            } else {
+                formData.append('file', audioBlob, filename);
+                processUpload(formData, source);
+            }
+        }
+        
+        function bufferToWav(buffer) {
+            // Simple WAV conversion (for demonstration)
+            // In production, use a proper library like recorderjs
+            const numChannels = 1;
+            const sampleRate = 16000;
+            const format = 1; // PCM
+            const bitDepth = 16;
+            
+            const bytesPerSample = bitDepth / 8;
+            const blockAlign = numChannels * bytesPerSample;
+            const byteRate = sampleRate * blockAlign;
+            const dataSize = buffer.length * numChannels * bytesPerSample;
+            
+            const bufferLength = 44 + dataSize;
+            const arrayBuffer = new ArrayBuffer(bufferLength);
+            const view = new DataView(arrayBuffer);
+            
+            // Write WAV header
+            writeString(view, 0, 'RIFF');
+            view.setUint32(4, 36 + dataSize, true);
+            writeString(view, 8, 'WAVE');
+            writeString(view, 12, 'fmt ');
+            view.setUint32(16, 16, true);
+            view.setUint16(20, format, true);
+            view.setUint16(22, numChannels, true);
+            view.setUint32(24, sampleRate, true);
+            view.setUint32(28, byteRate, true);
+            view.setUint16(32, blockAlign, true);
+            view.setUint16(34, bitDepth, true);
+            writeString(view, 36, 'data');
+            view.setUint32(40, dataSize, true);
+            
+            // Write PCM audio data
+            const writeAudio = (offset, channel) => {
+                for (let i = 0; i < buffer.length; i++, offset += 2) {
+                    const sample = Math.max(-1, Math.min(1, buffer.getChannelData(channel)[i]));
+                    view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
+                }
+            };
+            
+            let offset = 44;
+            for (let channel = 0; channel < numChannels; channel++) {
+                writeAudio(offset, channel);
+                offset += buffer.length * 2;
+            }
+            
+            return new Blob([view], { type: 'audio/wav' });
+        }
+        
+        function writeString(view, offset, string) {
+            for (let i = 0; i < string.length; i++) {
+                view.setUint8(offset + i, string.charCodeAt(i));
+            }
+        }
+        
+        // function processUpload(formData, source) {
+        //     const statusElement = source === 'record' ? recordStatus : uploadStatus;
+        //     showStatus("Uploading and processing audio...", "success", source);
+            
+        //     formData.append('rtt', '50'); // Simulated RTT
+            
+        //     fetch('/upload', {
+        //         method: 'POST',
+        //         body: formData
+        //     })
+        //     .then(response => {
+        //         if (!response.ok) {
+        //             throw new Error(`Server error: ${response.status}`);
+        //         }
+        //         return response.json();
+        //     })
+        //     .then(data => {
+        //         if (data.error) {
+        //             throw new Error(data.error);
+        //         }
+                
+        //         showStatus("Audio processing complete!", "success", source);
+                
+        //         // Show results section
+        //         resultsSection.style.display = 'block';
+                
+        //         // Set processed audio source
+        //         processedAudio.src = data.processed_audio;
+                
+        //         // Update metrics
+        //         if (data.results) {
+        //             snrValue.textContent = data.results.snr_db?.toFixed(2) || '--';
+        //             latencyValue.textContent = data.results.latency?.total_latency?.toFixed(2) || '--';
+        //             peaqValue.textContent = data.results.peaq_score?.toFixed(2) || '--';
+        //         }
+                
+        //         // Scroll to results
+        //         resultsSection.scrollIntoView({ behavior: 'smooth' });
+        //     })
+        //     .catch(err => {
+        //         showStatus(`Processing failed: ${err.message}`, "error", source);
+        //         console.error("Upload error:", err);
+        //     });
+        // }
+
+        function processUpload(formData, source) {
+            const statusElement = source === 'record' ? recordStatus : uploadStatus;
+            showStatus("Uploading and processing audio...", "success", source);
+            
+            // Add loading state
+            const uploadBtn = source === 'record' ? uploadRecordBtn : uploadFileBtn;
+            uploadBtn.disabled = true;
+            uploadBtn.textContent = "Processing...";
+
+            formData.append('session_id', sessionId);
+
+            fetch('/upload', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(err => {
+                        throw new Error(err.error || `Server error: ${response.status}`);
+                    });
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+                
+                showStatus("Audio processing complete!", "success", source);
+                
+                // Show results section
+                resultsSection.style.display = 'block';
+                
+                // Set processed audio source
+                processedAudio.src = data.processed_audio;
+                processedAudio.load();  // force reload
+
+                
+                // Update metrics
+                if (data.results) {
+                    snrValue.textContent = data.results.snr_db?.toFixed(2) || '--';
+                    latencyValue.textContent = data.results.latency?.total_latency?.toFixed(2) || '--';
+                    peaqValue.textContent = data.results.peaq_score?.toFixed(2) || '--';
+                }
+            })
+            .catch(err => {
+                showStatus(`Processing failed: ${err.message}`, "error", source);
+                console.error("Full error:", err);
+                
+                // Try to parse additional error details
+                if (err.response) {
+                    err.response.json().then(details => {
+                        console.error("Error details:", details);
+                    });
+                }
+            })
+            .finally(() => {
+                uploadBtn.disabled = false;
+                uploadBtn.textContent = source === 'record' ? "Process Recording" : "Process Upload";
+            });
+        }
+
+        
+        function submitMosRating(e) {
+            e.preventDefault();
+            
+            const clarity = parseInt(document.querySelector('input[name="clarity"]:checked')?.value);
+            const noiseReduction = parseInt(document.querySelector('input[name="noise"]:checked')?.value);
+            const levelMatching = parseInt(document.querySelector('input[name="level"]:checked')?.value);
+            
+            if (!clarity || !noiseReduction || !levelMatching) {
+                showStatus("Please rate all categories", "error", 'results');
+                return;
+            }
+            
+            fetch('/submit_mos', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    clarity: clarity,
+                    noise_reduction: noiseReduction,
+                    level_matching: levelMatching,
+                    audio_file: `${sessionId}.wav`
+                })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`Server error: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log("MOS response:", data);
+                if (data.error){ 
+                    throw new Error(data.error);
+                }
+                showStatus("Thank you for your feedback!", "success", 'results');
+            })
+            .catch(err => {
+                showStatus(`Failed to submit rating: ${err.message}`, "error", 'results');
+                console.error("Rating submission error:", err);
+            });
+        }
+        
+        function downloadAudio() {
+            if (!processedAudio.src || processedAudio.src.trim() === '') {
+                showStatus("No processed audio available to download", "error", 'results');
+                return;
+            }
+
+            
+            const a = document.createElement('a');
+            a.href = processedAudio.src;
+            a.download = `enhanced_${sessionId}.wav`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+        
+        function showStatus(message, type, section) {
+            const statusElement = 
+                section === 'record' ? recordStatus :
+                section === 'upload' ? uploadStatus :
+                // document.getElementById('resultsSection').querySelector('.status') || 
+                document.getElementById('resultsStatus');
+                document.createElement('div');
+            
+            statusElement.textContent = message;
+            statusElement.className = `status ${type}`;
+            statusElement.style.display = 'block';
+            
+            // Hide after 5 seconds
+            setTimeout(() => {
+                statusElement.style.display = 'none';
+            }, 5000);
+        }
+    </script>
+</body>
+</html>
