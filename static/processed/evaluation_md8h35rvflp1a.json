@@ -1,0 +1,21 @@
+{
+    "snr_db": -6.043392849441691,
+    "snr_class": "Unreliable",
+    "peaq_score": 19.522400833919093,
+    "latency": {
+        "processing_latency": 14.24715518951416,
+        "network_latency": 0.0,
+        "total_latency": 14.24715518951416
+    },
+    "mos": {
+        "clarity": 0,
+        "noise_reduction": 0,
+        "level_matching": 0,
+        "mos_average": 0.0
+    },
+    "audio_info": {
+        "sample_rate": 16000,
+        "duration_seconds": 226.47,
+        "audio_length_samples": 3623520
+    }
+}

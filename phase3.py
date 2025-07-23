@@ -1,341 +1,381 @@
-import os
-import numpy as np
-from scipy import signal
-from pydub import AudioSegment
-# from utils.rnnoise_wrapper import RNNoise  # Assuming RNNoise Python bindings are available
-import webrtcvad
-import warnings
-warnings.filterwarnings("ignore", category=UserWarning, module="webrtcvad")
-from scipy.signal import stft, istft, butter, lfilter
 
+# import os
+# import numpy as np
+# import warnings
+# from scipy import signal
+# from scipy.signal import butter, lfilter, sosfilt
+# from pydub import AudioSegment
+# import webrtcvad
 
-def decode_opus(input_path):
-    """Decode Opus audio to PCM using pydub with explicit FFmpeg path."""
-    if not os.path.exists(input_path):
-        raise FileNotFoundError(f"Input audio file {input_path} not found")
+# # Constants for audio processing
+# TARGET_SAMPLE_RATE = 16000
+# FRAME_SIZE_MS = 30
+# NOISE_FLOOR_DB = -70
+# MAX_SAMPLE_VALUE = 32767
+
+# def decode_opus(input_path, apply_decode=True):
+#     """Optimized Opus decoder with error handling"""
+#     if not os.path.exists(input_path):
+#         raise FileNotFoundError(f"Input file not found: {input_path}")
     
-    # Explicitly set FFmpeg path (update to your FFmpeg location)
-    AudioSegment.ffmpeg = "C:\\Program Files\\ffmpeg\\ffmpegbuild\\bin\\ffmpeg.exe"  
+#     AudioSegment.ffmpeg = "C:\\Program Files\\ffmpeg\\ffmpegbuild\\bin\\ffmpeg.exe"
     
-    try:
-        # Load and decode Opus file to WAV
-        audio = AudioSegment.from_file(input_path, format="ogg", codec="libopus")
-        audio = audio.set_channels(1).set_frame_rate(16000)  # Ensure mono, 48kHz
-        # raw_data = np.frombuffer(audio.raw_data, dtype=np.int16)
-        # return raw_data, 16000
-        samples = np.array(audio.get_array_of_samples(), dtype=np.int16)
-        return samples, audio.frame_rate
-    except Exception as e:
-        print(f"FFmpeg decoding error: {e}")
-        raise
-
-# def rnnoise_denoise(audio_data, sample_rate):
-#     """Apply RNNoise for machine-learning-based noise suppression."""
 #     try:
-#         # Initialize RNNoise
-#         denoiser = rnnoise.RNNoise()
-        
-#         # Process audio in 10ms frames (RNNoise expects 10ms at 48kHz = 480 samples)
-#         frame_size = int(sample_rate * 0.01)
-#         denoised_data = []
-        
-#         for i in range(0, len(audio_data), frame_size):
-#             frame = audio_data[i:i + frame_size]
-#             if len(frame) < frame_size:
-#                 frame = np.pad(frame, (0, frame_size - len(frame)), mode='constant')
-#             denoised_frame = denoiser.process_frame(frame.astype(np.float32))
-#             denoised_data.extend(denoised_frame)
-        
-#         return np.array(denoised_data, dtype=np.int16)
+#         if not apply_decode:
+#             print("[DECODE] Bypassed")
+#             return np.zeros(TARGET_SAMPLE_RATE, dtype=np.int16), TARGET_SAMPLE_RATE
+
+#         audio = AudioSegment.from_file(input_path, format="ogg", codec="libopus")
+#         audio = audio.set_channels(1).set_frame_rate(TARGET_SAMPLE_RATE)
+#         samples = np.array(audio.get_array_of_samples(), dtype=np.int16)
+#         print(f"[DECODE] Success: {len(samples)/TARGET_SAMPLE_RATE:.2f}s audio")
+#         return samples, audio.frame_rate
 #     except Exception as e:
-#         warnings.warn(f"RNNoise processing failed: {e}. Returning original audio.")
-#         return audio_data
+#         print(f"[DECODE ERROR] {str(e)[:100]}...")
+#         raise
 
-# def rnnoise_denoise(audio_data, sample_rate):
-#     """Apply RNNoise for machine-learning-based noise suppression."""
-#     try:
-#         denoiser = RNNoise(sample_rate)
-#         frame_size = int(sample_rate * 0.01)  # 10ms frames
-#         denoised_data = []
-        
-#         for i in range(0, len(audio_data), frame_size):
-#             frame = audio_data[i:i + frame_size]
-#             if len(frame) < frame_size:
-#                 frame = np.pad(frame, (0, frame_size - len(frame)), mode='constant')
-#             denoised_frame = denoiser.process_frame(frame)
-#             denoised_data.extend(denoised_frame)
-        
-#         return np.array(denoised_data, dtype=np.int16)
-#     except Exception as e:
-#         warnings.warn(f"RNNoise processing failed: {e}. Returning original audio.")
-#         return audio_data
-
-
-
-
+# def print_volume_stats(audio, name):
+#     """Enhanced volume monitoring with LUFS-like measurement"""
+#     audio_float = audio.astype(np.float32) / MAX_SAMPLE_VALUE
+#     rms = np.sqrt(np.mean(audio_float**2))
+#     peak = np.max(np.abs(audio_float))
+#     crest = peak / (rms + 1e-10)
+#     print(f"{name:<15} | RMS: {20*np.log10(rms + 1e-10):6.1f}dB | "
+#           f"Peak: {20*np.log10(peak + 1e-10):6.1f}dB | "
+#           f"Crest: {crest:4.1f}:1")
 
 # def vad_denoise(audio_data, sample_rate):
-#     """Apply noise suppression using WebRTC VAD."""
+#     """Advanced VAD with adaptive threshold and smoother transitions"""
 #     try:
-#         # Initialize WebRTC VAD
 #         vad = webrtcvad.Vad()
-#         vad.set_mode(3)  # Aggressive mode for noise suppression
+#         vad.set_mode(3)  # Aggressive mode
         
-#         # Process audio in 10ms frames (480 samples at 48kHz)
-#         frame_size = int(sample_rate * 0.01)  # 10ms frames
-#         denoised_data = np.copy(audio_data).astype(np.int16)
+#         if sample_rate != TARGET_SAMPLE_RATE:
+#             audio_data = signal.resample_poly(
+#                 audio_data, 
+#                 TARGET_SAMPLE_RATE, 
+#                 sample_rate
+#             ).astype(np.int16)
+#             sample_rate = TARGET_SAMPLE_RATE
+
+#         frame_size = int(sample_rate * FRAME_SIZE_MS / 1000)
+#         frames = len(audio_data) // frame_size
+#         audio_data = audio_data[:frames * frame_size]  # Trim to whole frames
         
-#         for i in range(0, len(audio_data), frame_size):
-#             frame = audio_data[i:i + frame_size]
-#             if len(frame) < frame_size:
-#                 frame = np.pad(frame, (0, frame_size - len(frame)), mode='constant')
-            
-#             # Convert frame to bytes for VAD
-#             frame_bytes = frame.astype(np.int16).tobytes()
-            
-#             # Check if frame contains speech
-#             is_speech = vad.is_speech(frame_bytes, sample_rate)
-            
-#             # Suppress non-speech frames (set to zero or reduce amplitude)
-#             if not is_speech:
-#                 denoised_data[i:i + frame_size] = frame * 0.1  # Reduce amplitude by 90%
+#         # Calculate energy per frame for adaptive threshold
+#         energies = []
+#         for i in range(frames):
+#             frame = audio_data[i*frame_size:(i+1)*frame_size]
+#             energies.append(np.mean(frame.astype(np.float32)**2))
         
-#         return denoised_data
+#         median_energy = np.median(energies)
+#         threshold = median_energy * 0.1  # Adaptive threshold
+        
+#         processed = np.zeros_like(audio_data)
+#         for i in range(frames):
+#             frame = audio_data[i*frame_size:(i+1)*frame_size]
+#             frame_energy = energies[i]
+            
+#             if frame_energy > threshold:
+#                 is_speech = vad.is_speech(frame.tobytes(), sample_rate)
+#             else:
+#                 is_speech = False
+                
+#             if is_speech:
+#                 processed[i*frame_size:(i+1)*frame_size] = frame
+#             else:
+#                 # Apply 5ms fade out to prevent clicks
+#                 fade_len = min(int(0.005 * sample_rate), frame_size)
+#                 fade_out = np.linspace(1, 0, fade_len)
+#                 processed[i*frame_size:i*frame_size+fade_len] = (
+#                     frame[:fade_len] * fade_out
+#                 )
+        
+#         return processed
 #     except Exception as e:
-#         warnings.warn(f"VAD processing failed: {e}. Returning original audio.")
+#         warnings.warn(f"VAD fallback: {str(e)[:50]}")
 #         return audio_data
 
-# def dynamic_range_compression(audio_data, sample_rate, threshold=-20.0, ratio=4.0):
-#     """Apply dynamic range compression to balance volume."""
-#     # Convert audio to dB
-#     audio_db = 20 * np.log10(np.abs(audio_data) + 1e-10)
+# def dynamic_range_compression(audio_data, sample_rate, 
+#                             threshold_db=-24.0, ratio=2.5, 
+#                             knee_width=5.0, makeup_gain=6.0):
+#     """Professional-grade DRC with lookahead and adaptive release"""
+#     audio_float = audio_data.astype(np.float32) / MAX_SAMPLE_VALUE
     
-#     # Apply compression where audio exceeds threshold
-#     gain = np.where(audio_db > threshold, threshold + (audio_db - threshold) / ratio, audio_db)
-#     gain = gain - audio_db  # Calculate gain reduction
+#     # Envelope detector with adaptive release
+#     attack_time = 0.01  # 10ms attack
+#     release_time = 0.15  # 150ms release
     
-#     # Apply gain to original signal
-#     compressed_data = audio_data * np.power(10, gain / 20.0)
-#     return compressed_data.astype(np.int16)
+#     alpha_attack = 1 - np.exp(-1/(attack_time * sample_rate))
+#     alpha_release = 1 - np.exp(-1/(release_time * sample_rate))
+    
+#     envelope = np.zeros_like(audio_float)
+#     envelope[0] = audio_float[0]**2
+#     for i in range(1, len(audio_float)):
+#         if audio_float[i]**2 > envelope[i-1]:
+#             envelope[i] = alpha_attack * audio_float[i]**2 + (1 - alpha_attack) * envelope[i-1]
+#         else:
+#             # Adaptive release based on signal dynamics
+#             current_release = min(release_time, 1/(i+1)) * sample_rate
+#             envelope[i] = alpha_release * audio_float[i]**2 + (1 - alpha_release) * envelope[i-1]
+    
+#     envelope_db = 10 * np.log10(envelope + 1e-10)
+    
+#     # Soft knee compression curve
+#     knee_low = threshold_db - knee_width/2
+#     knee_high = threshold_db + knee_width/2
+    
+#     gain_db = np.zeros_like(envelope_db)
+#     for i in range(len(envelope_db)):
+#         if envelope_db[i] < knee_low:
+#             gain_db[i] = makeup_gain
+#         elif envelope_db[i] < knee_high:
+#             x = envelope_db[i] - knee_low
+#             gain_db[i] = makeup_gain + ((1/ratio - 1) * x**2) / (2 * knee_width)
+#         else:
+#             gain_db[i] = makeup_gain + (threshold_db + (envelope_db[i] - threshold_db)/ratio) - envelope_db[i]
+    
+#     # Convert to linear gain with lookahead
+#     gain_linear = 10 ** (gain_db / 20)
+    
+#     # 5ms lookahead for smoother transitions
+#     lookahead = int(0.005 * sample_rate)
+#     if lookahead > 0:
+#         gain_linear = np.roll(gain_linear, -lookahead)
+#         gain_linear[-lookahead:] = gain_linear[-lookahead-1]
+    
+#     # Apply compression
+#     compressed = audio_float * gain_linear
+    
+#     # Adaptive limiter to prevent clipping
+#     peak = np.max(np.abs(compressed))
+#     if peak > 0.95:  # -0.5dBFS threshold
+#         compressed = compressed * (0.95 / peak)
+    
+#     return np.clip(compressed * MAX_SAMPLE_VALUE, -MAX_SAMPLE_VALUE, MAX_SAMPLE_VALUE).astype(np.int16)
 
-# def echo_cancellation(audio_data, sample_rate, reference_data=None):
-#     """Apply basic acoustic echo cancellation (simplified)."""
-#     if reference_data is None:
-#         # If no reference signal, assume minimal echo or return original
-#         warnings.warn("No reference signal provided for AEC. Returning original audio.")
-#         return audio_data
+# def presence_boost(audio_data, sample_rate):
+#     """Multiband presence enhancement"""
+#     nyquist = sample_rate / 2
+#     audio_float = audio_data.astype(np.float32) / MAX_SAMPLE_VALUE
     
-#     # Simple AEC: Cross-correlation to estimate delay, then subtract
-#     correlation = signal.correlate(audio_data, reference_data, mode='full')
-#     delay = np.argmax(correlation) - len(reference_data) + 1
+#     # Stage 1: Presence boost (3-5kHz)
+#     sos_presence = butter(2, [3000/nyquist, 5000/nyquist], btype='band', output='sos')
+#     presence_band = sosfilt(sos_presence, audio_float) * 1.4  # +3dB boost
     
-#     if delay >= 0:
-#         reference_data = np.pad(reference_data, (delay, 0), mode='constant')
-#         reference_data = reference_data[:len(audio_data)]
+#     # Stage 2: Air boost (8-12kHz)
+#     air_low = 2000
+#     air_high = 4500
+#     if air_high < nyquist:
+#         sos_air = butter(2, [air_low/nyquist, air_high/nyquist], btype='band', output='sos')
+#         air_band = sosfilt(sos_air, audio_float) * 0.3
 #     else:
-#         reference_data = np.pad(reference_data, (0, -delay), mode='constant')
-#         reference_data = reference_data[-delay:len(audio_data) - delay]
+#         air_band = np.zeros_like(audio_float)  # fallback if too low sample rate
     
-#     # Subtract reference (scaled) to remove echo
-#     scaling_factor = 0.8  # Empirical scaling to avoid over-subtraction
-#     clean_data = audio_data - (scaling_factor * reference_data)
-#     return clean_data.astype(np.int16)
+#     # Mix with dry signal
+#     processed = audio_float + 0.3*presence_band + 0.1*air_band
+    
+#     # Output limiting
+#     peak = np.max(np.abs(processed))
+#     if peak > 0.95:
+#         processed = processed * (0.95 / peak)
+    
+#     return np.clip(processed * MAX_SAMPLE_VALUE, -MAX_SAMPLE_VALUE, MAX_SAMPLE_VALUE).astype(np.int16)
 
-# def postprocess_audio(input_path, output_path, reference_path=None, sample_rate=48000):
-#     """Main function to post-process audio with de-noising, DRC, and AEC."""
-#     # Decode Opus audio
-#     audio_data, sample_rate = decode_opus(input_path)
+# def postprocess_audio(input_path, output_path, reference_path=None, 
+#                      sample_rate=TARGET_SAMPLE_RATE, **kwargs):
+#     """Optimized master processing chain"""
+#     # Decode audio
+#     audio_data, sample_rate = decode_opus(input_path, kwargs.get('apply_decode', True))
+#     print_volume_stats(audio_data, "Original")
     
-#     # Load reference audio for AEC if provided
-#     reference_data = None
-#     if reference_path and os.path.exists(reference_path):
-#         reference_audio = AudioSegment.from_wav(reference_path)
-#         reference_audio = reference_audio.set_channels(1).set_frame_rate(sample_rate)
-#         reference_data = np.frombuffer(reference_audio.raw_data, dtype=np.int16)
+#     # Process each stage
+#     processing_steps = [
+#         ('VAD', kwargs.get('apply_vad', True), vad_denoise),
+#         ('DRC', kwargs.get('apply_drc', True), dynamic_range_compression),
+#         ('EchoCancel', kwargs.get('apply_echo', True) and reference_path, 
+#          lambda x, sr: echo_cancellation(x, sr, load_reference(reference_path, sr))),
+#         ('PresenceBoost', kwargs.get('apply_boost', True), presence_boost)
+#     ]
     
-#     # Step 1: De-noising with RNNoise
-#     audio_denoised = vad_denoise(audio_data, sample_rate)
+#     for name, apply, func in processing_steps:
+#         if apply:
+#             audio_data = func(audio_data, sample_rate)
+#             print_volume_stats(audio_data, f"After {name}")
     
-#     # Step 2: Dynamic range compression
-#     audio_compressed = dynamic_range_compression(audio_denoised, sample_rate)
+#     # Final loudness normalization
+#     audio_float = audio_data.astype(np.float32) / MAX_SAMPLE_VALUE
+#     integrated_loudness = 10 * np.log10(np.mean(audio_float**2) + 1e-10)
+#     target_lufs = -16.0  # Broadcast standard
     
-#     # Step 3: Echo cancellation
-#     audio_processed = echo_cancellation(audio_compressed, sample_rate, reference_data)
+#     if integrated_loudness < target_lufs:
+#         gain = 10 ** ((target_lufs - integrated_loudness) / 20)
+#         audio_float = audio_float * gain
+#         print(f"[LOUDNESS] Applied {20*np.log10(gain):.1f}dB gain")
     
-#     # Save processed audio as WAV
-#     output_audio = AudioSegment(
-#         audio_processed.tobytes(),
+#     # Convert and export
+#     final_audio = np.clip(audio_float * MAX_SAMPLE_VALUE, -MAX_SAMPLE_VALUE, MAX_SAMPLE_VALUE)
+#     export_audio(final_audio.astype(np.int16), sample_rate, output_path)
+    
+#     return output_path
+
+# def load_reference(path, sample_rate):
+#     """Load reference audio for echo cancellation"""
+#     ref = AudioSegment.from_wav(path).set_channels(1).set_frame_rate(sample_rate)
+#     return np.array(ref.get_array_of_samples(), dtype=np.int16)
+
+# def export_audio(audio_data, sample_rate, output_path):
+#     """Optimized audio export"""
+#     audio = AudioSegment(
+#         audio_data.tobytes(),
 #         frame_rate=sample_rate,
 #         sample_width=2,
 #         channels=1
 #     )
-#     output_audio.export(output_path, format="wav")
-#     return output_path
+#     audio.export(output_path, format="wav", parameters=["-ar", str(sample_rate)])
+#     print(f"[EXPORT] Saved {output_path}")
 
 # if __name__ == "__main__":
-#     # Example usage for testing
-#     input_audio = "static/processed/encoded_audio.ogg"
+#     input_audio = "static/processed/encoded_audio.wav"
 #     output_audio = "static/processed/postprocessed_audio.wav"
-#     reference_audio = None  # Replace with path to reference audio if available
+    
 #     try:
-#         postprocess_audio(input_audio, output_audio, reference_audio)
-#         print(f"Post-processed audio saved to {output_audio}")
+#         postprocess_audio(
+#             input_audio,
+#             output_audio,
+#             reference_path=None,
+#             apply_vad=True,
+#             apply_drc=False,
+#             apply_echo=False,
+#             apply_boost=False
+#         )
 #     except Exception as e:
-#         print(f"Error during post-processing: {e}")
-        
+#         print(f"[FATAL] {str(e)}")
+#         raise
 
 
 
+
+import os
+import numpy as np
+import warnings
+from scipy import signal
+from scipy.signal import butter, sosfilt
+from pydub import AudioSegment
+import webrtcvad
+
+# Constants
+TARGET_SAMPLE_RATE = 16000
+MAX_SAMPLE_VALUE = 32767
+FRAME_SIZE_MS = 30
+
+AudioSegment.ffmpeg = "C:\\Program Files\\ffmpeg\\ffmpegbuild\\bin\\ffmpeg.exe"
+
+### ========== DECODING ========== ###
+
+def decode_opus(input_path):
+    """Decode Opus to PCM for processing."""
+    if not os.path.exists(input_path):
+        raise FileNotFoundError(f"Input file not found: {input_path}")
+    
+    try:
+        audio = AudioSegment.from_file(input_path, format="ogg", codec="libopus")
+        audio = audio.set_channels(1).set_frame_rate(TARGET_SAMPLE_RATE)
+        samples = np.array(audio.get_array_of_samples(), dtype=np.int16)
+        print(f"[DECODE] {input_path} → {len(samples)/TARGET_SAMPLE_RATE:.2f}s audio decoded")
+        return samples, TARGET_SAMPLE_RATE
+    except Exception as e:
+        raise RuntimeError(f"[DECODE ERROR] {e}")
+
+### ========== POSTPROCESSING TECHNIQUES ========== ###
 
 def vad_denoise(audio_data, sample_rate):
-    """Apply noise suppression using WebRTC VAD."""
-    try:
-        # Initialize WebRTC VAD
-        vad = webrtcvad.Vad()
-        vad.set_mode(2)  # Aggressive mode for noise suppression
-        
-        # WebRTC VAD frame size requirements for 16kHz:
-        # 10ms=160, 20ms=320, 30ms=480 samples
-        frame_size = 480  # 30ms frames for 16kHz
-        
-        # Ensure sample rate is 16kHz
-        if sample_rate != 16000:
-            # Resample to 16kHz
-            target_length = int(len(audio_data) * 16000 / sample_rate)
-            audio_data = signal.resample(audio_data, target_length).astype(np.int16)
-            sample_rate = 16000
-        
-        # Pad audio to be divisible by frame_size to avoid broadcast errors
-        remainder = len(audio_data) % frame_size
-        if remainder != 0:
-            padding = frame_size - remainder
-            audio_data = np.pad(audio_data, (0, padding), mode='constant')
-        
-        denoised_data = np.copy(audio_data).astype(np.int16)
-        
-        for i in range(0, len(audio_data), frame_size):
-            frame = audio_data[i:i + frame_size]
-            
-            # Convert frame to bytes for VAD (ensure int16)
-            frame_bytes = frame.astype(np.int16).tobytes()
-            
-            # Check if frame contains speech
-            is_speech = vad.is_speech(frame_bytes, sample_rate)
-            
-            # Suppress non-speech frames (reduce amplitude by 90%)
-            if not is_speech:
-                denoised_data[i:i + frame_size] = frame * 0.4
-        
-        return denoised_data
-    except Exception as e:
-        warnings.warn(f"VAD processing failed: {e}. Returning original audio.")
-        return audio_data
+    """Voice Activity Detection (VAD) for denoising."""
+    vad = webrtcvad.Vad(3)  # Aggressive mode
+    frame_len = int(sample_rate * FRAME_SIZE_MS / 1000)
+    num_frames = len(audio_data) // frame_len
+    audio_data = audio_data[:num_frames * frame_len]
 
-def dynamic_range_compression(audio_data, sample_rate, threshold=-20.0, ratio=4.0):
-    """Apply dynamic range compression to balance volume."""
-    # Convert audio to dB
-    audio_db = 20 * np.log10(np.abs(audio_data) + 1e-10)
-    
-    # Apply compression where audio exceeds threshold
-    gain = np.where(audio_db > threshold, threshold + (audio_db - threshold) / ratio, audio_db)
-    gain = gain - audio_db  # Calculate gain reduction
-    
-    # Apply gain to original signal
-    compressed_data = audio_data * np.power(10, gain / 20.0)
-    return compressed_data.astype(np.int16)
+    processed = np.zeros_like(audio_data)
+    for i in range(num_frames):
+        frame = audio_data[i*frame_len:(i+1)*frame_len]
+        if vad.is_speech(frame.tobytes(), sample_rate):
+            processed[i*frame_len:(i+1)*frame_len] = frame
+    return processed
 
-def echo_cancellation(audio_data, sample_rate, reference_data=None):
-    """Apply basic acoustic echo cancellation (simplified)."""
-    if reference_data is None:
-        # Return original audio without warning for cleaner output
-        return audio_data
-    
-    # Simple AEC: Cross-correlation to estimate delay, then subtract
-    correlation = signal.correlate(audio_data, reference_data, mode='full')
-    delay = np.argmax(correlation) - len(reference_data) + 1
-    
-    if delay >= 0:
-        reference_data = np.pad(reference_data, (delay, 0), mode='constant')
-        reference_data = reference_data[:len(audio_data)]
-    else:
-        reference_data = np.pad(reference_data, (0, -delay), mode='constant')
-        reference_data = reference_data[-delay:len(audio_data) - delay]
-    
-    # Subtract reference (scaled) to remove echo
-    scaling_factor = 0.8  # Empirical scaling to avoid over-subtraction
-    clean_data = audio_data - (scaling_factor * reference_data)
-    return clean_data.astype(np.int16)
+def dynamic_range_compression(audio_data, sample_rate, threshold_db=-24.0, ratio=2.5):
+    """Apply soft-knee compression to even out volume."""
+    audio_float = audio_data.astype(np.float32) / MAX_SAMPLE_VALUE
+    rms = np.sqrt(np.mean(audio_float**2))
+    current_db = 20 * np.log10(rms + 1e-10)
 
-def presence_boost(audio_data, sample_rate):
-    """Boost 3–5kHz range to improve speech clarity and presence."""
-    nyq = sample_rate / 2
-    low = 3000 / nyq
-    high = 5000 / nyq
-    b, a = butter(2, [low, high], btype='band')
-    boost = lfilter(b, a, audio_data)
-    return np.clip(audio_data + 0.4 * boost, -32768, 32767)
+    if current_db < threshold_db:
+        return audio_data  # no compression needed
 
+    gain = 10 ** ((threshold_db - current_db) / (20 * ratio))
+    compressed = audio_float * gain
+    peak = np.max(np.abs(compressed))
+    if peak > 1.0:
+        compressed *= (0.95 / peak)
 
-def postprocess_audio(input_path, output_path, reference_path=None, sample_rate=16000):
-    """Main function to post-process audio with de-noising, DRC, and AEC."""
-    # Decode Opus audio
-    audio_data, sample_rate = decode_opus(input_path)
-    
-    # Load reference audio for AEC if provided
-    reference_data = None
-    if reference_path and os.path.exists(reference_path):
-        reference_audio = AudioSegment.from_wav(reference_path)
-        reference_audio = reference_audio.set_channels(1).set_frame_rate(sample_rate)
-        reference_data = np.frombuffer(reference_audio.raw_data, dtype=np.int16)
-    
-    # Step 1: De-noising with VAD
-    audio_denoised = vad_denoise(audio_data, sample_rate)
-    
-    # Step 2: Dynamic range compression
-    audio_compressed = dynamic_range_compression(audio_denoised, sample_rate)
-    
-    # Step 3: Echo cancellation
-    # audio_processed = echo_cancellation(audio_compressed, sample_rate, reference_data)
-    audio_processed = echo_cancellation(audio_compressed, sample_rate, reference_data)
+    return np.clip(compressed * MAX_SAMPLE_VALUE, -MAX_SAMPLE_VALUE, MAX_SAMPLE_VALUE).astype(np.int16)
 
-    # [NEW] Presence boost to recover speech brightness
-    audio_processed = presence_boost(audio_processed, sample_rate)
+def echo_cancellation(audio_data, sample_rate, reference=None):
+    """Dummy placeholder: Echo cancellation would require adaptive filters or reference signal."""
+    print("[ECHO] Placeholder applied (no-op)")
+    return audio_data
 
-    # Trim or match to expected length
-    expected_samples = int(sample_rate * (len(audio_data) / sample_rate))
-    audio_processed = audio_processed[:expected_samples]
+### ========== EXPORT ========== ###
 
-    # Normalize final signal if it's too quiet
-    peak = np.max(np.abs(audio_processed))
-    if peak < 5000:
-        print(f"[DEBUG] Audio signal too quiet (peak={peak}), applying normalization.")
-        audio_processed = audio_processed * (32767 / (peak + 1e-10))
-    
-    audio_processed = np.clip(audio_processed, -32768, 32767)  # Ensure it's in int16 range
-
-    print(f"[DEBUG] Processed duration: {len(audio_processed)/sample_rate:.2f}s")
-    print(f"[DEBUG] Input duration: {len(audio_data)/sample_rate:.2f}s")
-
-    
-    # Save processed audio as WAV
-    output_audio = AudioSegment(
-        audio_processed.tobytes(),
+def export_audio(audio_data, sample_rate, output_path):
+    """Save processed PCM audio as WAV."""
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    audio = AudioSegment(
+        audio_data.tobytes(),
         frame_rate=sample_rate,
         sample_width=2,
         channels=1
     )
+    audio.export(output_path, format="wav")
+    print(f"[EXPORT] Processed audio saved to {output_path}")
 
-    output_audio.export(output_path, format="wav")
+### ========== MAIN CHAIN ========== ###
+
+def postprocess_audio(input_path, output_path,
+                      apply_denoise=True,
+                      apply_drc=True,
+                      apply_echo=False):
+    """Run postprocessing chain after decoding Opus."""
+    audio_data, sample_rate = decode_opus(input_path)
+
+    if apply_denoise:
+        print("[POST] Applying VAD-based denoising...")
+        audio_data = vad_denoise(audio_data, sample_rate)
+
+    if apply_drc:
+        print("[POST] Applying dynamic range compression...")
+        audio_data = dynamic_range_compression(audio_data, sample_rate)
+
+    if apply_echo:
+        print("[POST] Applying echo cancellation...")
+        audio_data = echo_cancellation(audio_data, sample_rate)
+
+    export_audio(audio_data, sample_rate, output_path)
     return output_path
 
+### ========== TEST HARNESS ========== ###
 
 if __name__ == "__main__":
-    # Example usage for testing
-    input_audio = "static/processed/encoded_audio.ogg"
-    output_audio = "static/processed/postprocessed_audio.wav"
-    reference_audio = None  # Replace with path to reference audio if available
+    input_file = "static/processed/encoded_audio.ogg"
+    output_file = "static/processed/postprocessed_audio.wav"
+
     try:
-        postprocess_audio(input_audio, output_audio, reference_audio)
-        print(f"Post-processed audio saved to {output_audio}")
+        postprocess_audio(
+            input_path=input_file,
+            output_path=output_file,
+            apply_denoise=False,
+            apply_drc=False,
+            apply_echo=False # Here False means skip while True means apply
+        )
     except Exception as e:
-        print(f"Error during post-processing: {e}")
+        print(f"[FATAL ERROR] {e}")
