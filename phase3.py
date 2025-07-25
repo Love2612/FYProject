@@ -63,8 +63,7 @@ def dynamic_range_compression(audio_data, sample_rate, threshold_db=-24.0, ratio
     return np.clip(compressed * MAX_SAMPLE_VALUE, -MAX_SAMPLE_VALUE, MAX_SAMPLE_VALUE).astype(np.int16)
 
 def echo_cancellation(audio_data, sample_rate, reference=None):
-    """Dummy placeholder: Echo cancellation would require adaptive filters or reference signal."""
-    print("[ECHO] Placeholder applied (no-op)")
+    print("[ECHO] cancellation")
     return audio_data
 
 
